@@ -10,7 +10,8 @@
 # PPE Modifiee
 from numpy import (maximum as max_, minimum as min_, where,
                    logical_xor as xor_,
-                   logical_not as not_, logical_and as and_,
+                   logical_not as not_, 
+                   logical_and as and_,
                    logical_or as or_, round)
 
 import collections
@@ -18,11 +19,9 @@ import collections
 from openfisca_core.columns import IntCol, EnumCol, BoolCol, AgesCol, FloatCol
 from openfisca_core.enumerations import Enum
 
-from .data import QUIFOY, QUIFAM
-QUIFOY = Enum(['vous', 'conj', 'pac1', 'pac2', 'pac3', 'pac4', 'pac5', 'pac6', 'pac7', 'pac8', 'pac9'])
-QUIFAM = Enum(['chef', 'part', 'enf1', 'enf2', 'enf3', 'enf4', 'enf5', 'enf6', 'enf7', 'enf8', 'enf9'])
+from openfisca_france.model.data import QUIFOY, QUIFAM
 
-from .pfam import nb_enf, age_en_mois_benjamin
+from openfisca_france.model.pfam import nb_enf, age_en_mois_benjamin
 
 import logging
 
