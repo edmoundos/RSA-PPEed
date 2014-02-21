@@ -28,5 +28,6 @@ def case_study(year = 2013):
 #     print df.to_string()                 
 
 if __name__ == '__main__':
+
     case_study()
-  
+    
