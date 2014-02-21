@@ -1,0 +1,381 @@
+# Prime pour l'emploi
+    ('ppe_coef', Prestation(ir._ppe_coef, entity = 'foy')),
+    ('ppe_base', Prestation(ir._ppe_base)),
+    ('ppe_coef_tp', Prestation(ir._ppe_coef_tp)),
+    ('ppe_elig', BoolPresta(ir._ppe_elig, entity = 'foy')),
+    ('ppe_elig_i', BoolPresta(ir._ppe_elig_i)),
+    ('ppe_rev', Prestation(ir._ppe_rev)),
+    ('ppe_brute', Prestation(ir._ppe_brute, entity = 'foy', label = u"Prime pour l'emploi brute")),
+    ('ppe', Prestation(ir._ppe, 'foy', label = u"Prime pour l'emploi"))
+    
+# RSA/RMI
+    ############################################################
+
+    ('div_ms', Prestation(ms._div_ms)),
+    ('rfon_ms', Prestation(ms._rfon_ms)),
+
+    ('ra_rsa', Prestation(ms._ra_rsa, label = u"Revenus d'activité du Rsa")),
+    ('br_rmi_i', Prestation(ms._br_rmi_i)),
+    ('br_rmi_ms', Prestation(ms._br_rmi_ms)),
+    ('br_rmi_pf', Prestation(ms._br_rmi_pf)),
+    ('br_rmi', Prestation(ms._br_rmi, entity = 'fam', label = u"Base ressources du Rmi/Rsa")),
+
+    ('rmi_nbp', Prestation(ms._rmi_nbp, entity = 'fam', label = u"Nombre de personne à charge au sens du Rmi/Rsa")),
+    ('forf_log', Prestation(ms._forf_log, entity = 'fam')),
+    ('rsa_socle', Prestation(ms._rsa_socle, entity = 'fam', label = u"RSA socle")),
+    ('rmi', Prestation(ms._rmi, entity = 'fam', label = u"Revenu de solidarité active - socle")),
+    ('rsa', Prestation(ms._rsa, entity = 'fam', label = u"Revenu de solidarité active")),
+    ('rsa_act', Prestation(ms._rsa_act, entity = 'fam', label = u"Revenu de solidarité active - activité", start = date(2009, 7, 1))),
+    ('rsa_act_i', Prestation(ms._rsa_act_i)),
+    ('crds_mini', Prestation(ms._crds_mini, entity = 'fam', start = date(2009, 7, 1))),
+
+    
+ RSA / RMI
+############################################################################
+def _div_ms(f3vc, f3ve, f3vg, f3vl, f3vm):
+    return f3vc + f3ve + f3vg + f3vl + f3vm
+
+def _rfon_ms(f4ba, f4be):
+    '''
+    Revenus fonciers pour la base ressource du rmi/rsa
+    'ind'
+    '''
+    return f4ba + f4be
+
+def _ra_rsa(sal, hsup, rpns, etr):
+    '''
+    Revenus d'activité au sens du Rsa
+    'ind'
+    '''
+    return sal + hsup + rpns + etr
+
+def _br_rmi_pf(af_base, cf, asf, paje_base, paje_clca, paje_colca, apje, ape, _P):
+    """
+    Prestations familiales inclues dans la base ressource RSA/RMI
+    TO DO: Add mva (majoration vie autonome), 
+    """
+    P = _P.minim
+    if _P.datesim.year < 2004:  # taking care of the existence of the paje/ape/apje
+        out = P.rmi.pfInBRrmi * (af_base + cf + asf + apje + ape)
+    else:
+        out = P.rmi.pfInBRrmi * (af_base + cf + asf + paje_base + paje_clca + paje_colca )
+
+    return out
+
+def _br_rmi_ms(aspa, asi, aah, caah):
+    """
+    Minima sociaux inclus dans la base ressource RSA/RMI
+    'ind'
+    """
+    return aspa + asi + aah + caah
+
+def _br_rmi_i(ra_rsa, cho, rst, alr, rto, rev_cap_bar, rev_cap_lib, rfon_ms, div_ms):
+    '''
+    Base ressource individuelle du RSA/RMI
+    'ind'
+    '''
+    return ra_rsa + cho + rst + alr + rto + rev_cap_bar + rev_cap_lib + rfon_ms + div_ms
+
+def _br_rmi(br_rmi_pf, br_rmi_ms, br_rmi_i, _P,
+            _option = {'br_rmi_pf': [CHEF, PART], 'br_rmi_ms': [CHEF, PART], 'br_rmi_i': [CHEF, PART]}):
+    """
+    Base ressources du Rmi ou du Rsa
+    """
+
+#    Sont pris en compte:
+#    1 L’ensemble des revenus tirés d’une activité salariée ou non salariée ;
+#    2 Les revenus tirés de stages de formation professionnelle ;
+#    3 Les revenus tirés de stages réalisés en application de l’article 9 de
+#      la loi no  2006-396 du 31 mars 2006 pour l’égalité des chances ;
+#    4 L’aide légale ou conventionnelle aux salariés en chômage partiel ;
+#    5 Les indemnités perçues à l’occasion des congés légaux de maternité, de paternité ou d’adoption ;
+#    6 Les indemnités journalières de sécurité sociale, de base et complémentaires, perçues en cas d’incapacité
+#      physique médicalement constatée de continuer ou de reprendre le travail, d’accident du travail ou de maladie
+#      professionnelle pendant une durée qui ne peut excéder trois mois à compter de l’arrêt de travail
+#
+#    On ne tient pas compte:
+#    1 De la prime à la naissance ou à l’adoption mentionnée à l’article L. 531-2 du code de la sécurité
+#      sociale ;
+#    2 De l’allocation de base mentionnée à l’article L. 531-3 du code de la sécurité sociale due pour le mois
+#      au cours duquel intervient la naissance ou, dans les situations visées à l’article L. 262-9 du présent code,
+#      jusqu’au dernier jour du mois civil au cours duquel l’enfant atteint l’âge de trois mois ;
+#    3 De la majoration pour âge des allocations familiales mentionnée à l’article L. 521-3 du code de la
+#      sécurité sociale ainsi que de l’allocation forfaitaire instituée par le second alinéa de l’article L. 521-1 du même
+#      code ;
+#    4 De l’allocation de rentrée scolaire mentionnée à l’article L. 543-1 du code de la sécurité sociale ;
+#    5 Du complément de libre choix du mode de garde mentionné aux articles L. 531-5 à L. 531-9 du code de
+#      la sécurité sociale ;16 avril 2009 JOURNAL OFFICIEL DE LA RÉPUBLIQUE
+#      FRANÇAISE Texte 3 sur 110.
+#    6 De l’allocation d’éducation de l’enfant handicapé et de ses compléments mentionnés à l’article L. 541-1
+#      du code de la sécurité sociale, de la majoration spécifique pour personne isolée mentionnée à l’article L. 541-4
+#      du même code ainsi que de la prestation de compensation du handicap lorsqu’elle est perçue en application de
+#      l’article 94 de la loi no 2007-1786 du 19 décembre 2007 de financement de la sécurité sociale pour 2008 ;
+#    7 De l’allocation journalière de présence parentale mentionnée à l’article L. 544-1 du code de la sécurité sociale ;
+#    8 Des primes de déménagement prévues par les articles L. 542-8 du code de la sécurité sociale et L. 351-5
+#      du code de la construction et de l’habitation ;
+#    9 De la prestation de compensation mentionnée à l’article L. 245-1 ou de l’allocation compensatrice
+#      prévue au chapitre V du titre IV du livre II du code de l’action sociale et des familles dans sa rédaction antérieure
+#      à la loi no 2005-102 du 11 février 2005 pour l’égalité des droits et des chances, la participation et la
+#      citoyenneté des personnes handicapées, lorsque l’une ou l’autre sert à rémunérer un tiers ne faisant pas partie
+#      du foyer du bénéficiaire du revenu de solidarité active ;
+#    10 Des prestations en nature dues au titre des assurances maladie, maternité, accidents du travail et
+#       maladies professionnelles ou au titre de l’aide médicale de l’Etat ;
+#    11 De l’allocation de remplacement pour maternité prévue par les articles L. 613-19-1 et L. 722-8-1 du
+#       code de la sécurité sociale et L. 732-10 du code rural ;
+#    12 De l’indemnité en capital attribuée à la victime d’un accident du travail prévue à l’article L. 434-1 du
+#       code de la sécurité sociale ;
+#    13 De la prime de rééducation et du prêt d’honneur mentionnés à l’article R. 432-10 du code de la sécurité
+#       sociale ;
+#    14 Des aides et secours financiers dont le montant ou la périodicité n’ont pas de caractère régulier ainsi
+#       que des aides et secours affectés à des dépenses concourant à l’insertion du bénéficiaire et de sa famille,
+#       notamment dans les domaines du logement, des transports, de l’éducation et de la formation ;
+#    15 De la prime de retour à l’emploi et de l’aide personnalisée de retour à l’emploi mentionnées
+#       respectivement aux articles L. 5133-1 et L. 5133-8 du code du travail ainsi que de l’allocation mentionnée à
+#       l’article L. 5131-6 du même code ;
+#    16 Des bourses d’études ainsi que de l’allocation pour la diversité dans la fonction publique ;
+#    17 Des frais funéraires mentionnés à l’article L. 435-1 du code de la sécurité sociale ;
+#    18 Du capital décès servi par un régime de sécurité sociale ;
+#    19 De l’allocation du fonds de solidarité en faveur des anciens combattants d’Afrique du Nord prévue à
+#       l’article 125 de la loi no 91-1322 de finances pour 1992 ;
+#    20 De l’aide spécifique en faveur des conjoints survivants de nationalité française des membres des
+#       formations supplétives et assimilés, mentionnée aux premier et troisième alinéas de l’article 10 de la loi
+#       no 94-488 du 11 juin 1994 relative aux rapatriés, anciens membres des formations supplétives et assimilés ou
+#       victimes de la captivité en Algérie ;
+#    21 De l’allocation de reconnaissance instituée par l’article 47 de la loi no 99-1173 de finances rectificative pour 1999 ;
+#    22 Des mesures de réparation mentionnées à l’article 2 du décret no 2000-657 du 13 juillet 2000 instituant
+#       une mesure de réparation pour les orphelins dont les parents ont été victimes de persécutions antisémites ;
+#    23 Des mesures de réparation mentionnées à l’article 2 du décret no 2004-751 du 27 juillet 2004 instituant
+#       une aide financière en reconnaissance des souffrances endurées par les orphelins dont les parents ont été
+#       victimes d’actes de barbarie durant la Deuxième Guerre mondiale
+    
+    br_rmi = (br_rmi_i[CHEF] + br_rmi_pf[CHEF] + br_rmi_ms[CHEF] +
+              br_rmi_i[PART] + br_rmi_pf[PART] + br_rmi_ms[PART])
+    return br_rmi
+
+def _rmi_nbp(age, smic55, nb_par , _P, _option = {'age': ENFS, 'smic55': ENFS}):
+    '''
+    Nombre de personne à charge au sens du Rmi ou du Rsa
+    'fam'
+    '''
+    # TODO: file a issue to check if D_enfch in rsa should be removed
+    P = _P.minim.rmi
+    return nb_par + nb_enf(age, smic55, 0, P.age_pac - 1)  # TODO: check limite d'âge in legislation
+
+def _forf_log(so, rmi_nbp, _P):
+    '''
+    Forfait logement intervenant dans le calcul du Rmi ou du Rsa
+    'fam'
+    '''
+    # calcul du forfait logement annuel si le ménage touche des allocations logements
+    # mais également pour les propriétaires en tant qu'avantage en nature et les hébergés également
+    # donc on le donne à tout le monde
+    P = _P.minim
+    # loca = (3 <= so)&(5 >= so)
+    FL = P.rmi.forfait_logement
+    tx_fl = ((rmi_nbp == 1) * FL.taux1 +
+             (rmi_nbp == 2) * FL.taux2 +
+             (rmi_nbp >= 3) * FL.taux3)
+    return 12 * (tx_fl * P.rmi.rmi)
+
+def _rsa_socle(age, nb_par, rmi_nbp, _P, _option = {'age' : [CHEF, PART]}):
+    '''
+    Rsa socle / Rmi
+    'fam'
+    '''
+    P = _P.minim
+    # RSA socle TODO: mécanisme similaire à l'API: Pour les personnes ayant la charge
+    # d’au moins un enfant né ou à naître et se retrouvant en situation d’isolement,
+    # le montant forfaitaire est majoré pendant 12 mois, continus ou non, dans la
+    # limite de 18 mois à compter de la date du fait générateur de l’isolement. Le
+    # cas échéant, la durée de majoration est prolongée jusqu’à ce que le plus jeune
+    # enfant atteigne trois ans.
+    eligib = (age[CHEF] >= 25) | (age[PART] >= 25)
+    tx_rmi = (1 + (rmi_nbp >= 2) * P.rmi.txp2
+                 + (rmi_nbp >= 3) * P.rmi.txp3
+                 + (rmi_nbp >= 4) * ((nb_par == 1) * P.rmi.txps + (nb_par != 1) * P.rmi.txp3)
+                 + max_(rmi_nbp - 4, 0) * P.rmi.txps)
+    return 12 * P.rmi.rmi * tx_rmi * eligib
+
+def _rmi(rsa_socle, forf_log, br_rmi):
+    '''
+    Cacule le montant du RMI/ Revenu de solidarité active - socle
+    'fam'
+    '''
+    rmi = max_(0, rsa_socle - forf_log - br_rmi)
+    return rmi
+
+
+def _rsa(rsa_socle, ra_rsa, forf_log, br_rmi, _P, _option = {'ra_rsa': [CHEF, PART]}):
+    '''
+    Cacule le montant du RSA
+    'fam'
+    '''
+    P = _P.minim.rmi
+    RSA = max_(0, rsa_socle + P.pente * (ra_rsa[CHEF] + ra_rsa[PART]) - forf_log - br_rmi)
+    rsa = RSA * (RSA >= 12 * P.rsa_nv)
+    return rsa
+
+
+
+def _rsa_act(rsa, rmi):
+    '''
+    Calcule le montant du RSA activité
+    Note: le partage en moitié est un point de législation, pas un choix arbitraire
+    '''
+    res = max_(rsa - rmi, 0)
+    return res
+
+
+def _rsa_act_i(rsa_act, concub, maries, quifam, idfam):
+    '''
+    Calcule le montant du RSA activité
+    Note: le partage en moitié est un point de législation, pas un choix arbitraire
+    TODO: à refaire car cela ne marchera pas avec les données d'enquêtes si elles ne sont pas triées exactement comme il faut !
+    '''
+    conj = concub | maries
+    rsa_act_i = 0*rsa_act
+    rsa_act_i[quifam==0] = rsa_act[quifam==0]/(1+conj[quifam==0])
+    rsa_act_i[quifam==1] = rsa_act[conj]/ 2
+    return rsa_act_i
+
+
+
+def _crds_mini(rsa_act, _P):
+    return -_P.fam.af.crds * rsa_act
+
+
+# # Calcul de la prime pour l'emploi
+###############################################################################
+
+def _ppe_coef(jour_xyz):
+    '''
+    PPE: coefficient de conversion en cas de changement en cours d'année
+    '''
+    nb_jour = (jour_xyz == 0) + jour_xyz
+    return 360 / nb_jour
+
+def _ppe_elig(rfr, ppe_coef, ppe_rev, marpac, veuf, celdiv, nbptr, _P):
+    '''
+    PPE: eligibilité à la ppe, condition sur le revenu fiscal de référence
+    'foy'
+    CF ligne 1: http://bofip.impots.gouv.fr/bofip/3913-PGP.html
+    '''
+    P = _P.ir.credits_impot.ppe
+    seuil = (veuf | celdiv) * (P.eligi1 + 2 * max_(nbptr - 1, 0) * P.eligi3) \
+            + marpac * (P.eligi2 + 2 * max_(nbptr - 2, 0) * P.eligi3)
+    out = (rfr * ppe_coef) <= seuil
+    return out
+
+def _ppe_rev(sal, hsup, rpns, _P):
+    '''
+    base ressource de la ppe
+    'ind'
+    '''
+    P = _P.ir.credits_impot.ppe
+    # Revenu d'activité salarié
+    rev_sa = sal + hsup  # TODO: + TV + TW + TX + AQ + LZ + VJ
+    # Revenu d'activité non salarié
+    rev_ns = min_(0, rpns) / P.abatns + max_(0, rpns) * P.abatns
+    return rev_sa + rev_ns
+
+def _ppe_coef_tp(ppe_du_sa, ppe_du_ns, ppe_tp_sa, ppe_tp_ns, _P):
+    '''
+    PPE: coefficient de conversion temps partiel
+    'ind'
+    '''
+    P = _P.ir.credits_impot.ppe
+    frac_sa = ppe_du_sa / P.TP_nbh
+    frac_ns = ppe_du_ns / P.TP_nbj
+    tp = ppe_tp_sa | ppe_tp_ns | (frac_sa + frac_ns >= 1)
+    return tp + not_(tp) * (frac_sa + frac_ns)
+
+def _ppe_base(ppe_rev, ppe_coef_tp, ppe_coef, _option = {'ppe_coef':ALL}):
+    out = ppe_rev / (ppe_coef_tp + (ppe_coef_tp == 0)) * ppe_coef
+    return out
+
+def _ppe_elig_i(ppe_rev, ppe_coef_tp, _P):
+    '''
+    eligibilité individuelle à la ppe 
+    Attention : condition de plafonnement introduite dans ppe brute
+    '''
+    P = _P.ir.credits_impot.ppe
+    return (ppe_rev >= P.seuil1) & (ppe_coef_tp != 0)
+
+def _ppe_brute(ppe_elig, ppe_elig_i, ppe_rev, ppe_base, ppe_coef, ppe_coef_tp, nb_pac, marpac, celdiv, veuf, caseT, caseL, nbH, _P, _option = {'ppe_elig_i': ALL, 'ppe_base': ALL, 'ppe_rev': ALL, 'ppe_coef_tp': ALL}):
+    '''
+    Prime pour l'emploi (avant éventuel dispositif de cumul avec le RSA)
+    'foy'
+    Cf. http://travail-emploi.gouv.fr/informations-pratiques,89/fiches-pratiques,91/remuneration,113/la-prime-pour-l-emploi-ppe,1034.html
+    '''
+    P = _P.ir.credits_impot.ppe
+
+    eliv, elic, eli1, eli2, eli3 = ppe_elig_i[VOUS], ppe_elig_i[CONJ], ppe_elig_i[PAC1], ppe_elig_i[PAC2], ppe_elig_i[PAC3],
+    basevi, baseci = ppe_rev[VOUS], ppe_rev[CONJ]
+    basev, basec, base1, base2, base3 = ppe_base[VOUS], ppe_base[CONJ], ppe_base[PAC1], ppe_base[PAC2], ppe_base[PAC1]
+    coef_tpv, coef_tpc, coef_tp1, coef_tp2, coef_tp3 = ppe_coef_tp[VOUS], ppe_coef_tp[CONJ], ppe_coef_tp[PAC1], ppe_coef_tp[PAC2], ppe_coef_tp[PAC1]
+
+    nb_pac_ppe = max_(0, nb_pac - eli1 - eli2 - eli3)
+
+    ligne2 = marpac & xor_(basevi >= P.seuil1, baseci >= P.seuil1)
+    ligne3 = (celdiv | veuf) & caseT & not_(veuf & caseT & caseL)
+    ligne1 = not_(ligne2) & not_(ligne3)
+
+    base_monact = ligne2 * (eliv * basev + elic * basec)
+    base_monacti = ligne2 * (eliv * basevi + elic * baseci)
+
+    def ppe_bar1(base):
+#        cond1 = ligne1 | ligne3
+#        cond2 = ligne2
+#        return 1 / ppe_coef * ((cond1 & (base <= P.seuil2)) * (base) * P.taux1 +
+#                           (cond1 & (base > P.seuil2) & (base <= P.seuil3)) * (P.seuil3 - base) * P.taux2 +
+#                           (cond2 & (base <= P.seuil2)) * (base * P.taux1) +
+#                           (cond2 & (base > P.seuil2) & (base <= P.seuil3)) * ((P.seuil3 - base) * P.taux2) +
+#                           (cond2 & (base > P.seuil4) & (base <= P.seuil5)) * (P.seuil5 - base) * P.taux3)
+        return (1 / ppe_coef) * (((base <= P.seuil2)) * (base) * P.taux1 +
+                           ((base > P.seuil2) & (base <= P.seuil3)) * (P.seuil3 - base) * P.taux2 +
+                           ligne2 * ((base > P.seuil4) & (base <= P.seuil5)) * (P.seuil5 - base) * P.taux3)
+
+
+    def ppe_bar2(base):
+        return (1 / ppe_coef) * ((base <= P.seuil2) * (base) * P.taux1 +
+                           ((base > P.seuil2) & (base <= P.seuil3)) * (P.seuil3 - base1) * P.taux2)
+
+    # calcul des primes individuelles.
+
+    ppev = eliv * ppe_bar1(basev)
+    ppec = elic * ppe_bar1(basec)
+    ppe1 = eli1 * ppe_bar2(base1)
+    ppe2 = eli2 * ppe_bar2(base2)
+    ppe3 = eli3 * ppe_bar2(base3)
+
+    # Primes de monoactivité
+    ppe_monact_vous = (eliv & ligne2 & (basevi >= P.seuil1) & (basev <= P.seuil4)) * P.monact
+    ppe_monact_conj = (elic & ligne2 & (baseci >= P.seuil1) & (basec <= P.seuil4)) * P.monact
+
+    def coef(coef_tp):
+        return (coef_tp <= 0.5) * coef_tp * 1.45 + (coef_tp > 0.5) * (0.55 * coef_tp + 0.45)
+
+    ppe_vous = ppe_elig * (ppev * coef(coef_tpv) + ppe_monact_vous)
+    ppe_conj = ppe_elig * (ppec * coef(coef_tpc) + ppe_monact_conj)
+    ppe_pac1 = ppe_elig * (ppe1 * coef(coef_tp1))
+    ppe_pac2 = ppe_elig * (ppe2 * coef(coef_tp2))
+    ppe_pac3 = ppe_elig * (ppe3 * coef(coef_tp3))
+
+    ppe_tot = ppe_vous + ppe_conj + ppe_pac1 + ppe_pac2 + ppe_pac3 + maj_pac
+
+    ppe_tot = (ppe_tot != 0) * max_(P.versmin, ppe_tot)
+    # from pandas import DataFrame
+    # decompo = {0: ppev, 1 :ppe_vous, 2: ppec,3: ppe_conj, 4: maj_pac, 5 : ppe_monact_vous, 6: ppe_monact_conj, 8: basev, 81 : basevi, 9: basec, 91 : baseci, 10:ppe_tot}
+    # print DataFrame(decompo).to_string()
+
+    return ppe_tot
+
+def _ppe(ppe_brute, rsa_act_i, _option = {'rsa_act_i': [VOUS, CONJ]}):
+    """
+    PPE effectivement versé
+    'foy'
+    """
+#   On retranche le RSA activité de la PPE
+#   Dans les agrégats officiels de la DGFP, c'est la PPE brute qu'il faut comparer
+    ppe = max_(ppe_brute - rsa_act_i[VOUS] - rsa_act_i[CONJ], 0)
+    return ppe
